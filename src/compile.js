@@ -1,76 +1,111 @@
-import compileUtil from './CompileUtil';
+import Watcher from './Watcher';
 
-export default class Compile{
+export default class Compile {
+  constructor (vm, el) {
+    this.vm = vm;
+    this.fragment = null
+    this.el = document.querySelector(el);
+    this.init();
+  }
 
-  constructor (e,vm) {
-    this.$vm = vm;
-    this.$el = Compile.isElementNode(el) ? el : document.querySelector(el);
-    if (this.$el) {
-      this.$fragment = Compile.node2Fragment(this.$el);
-      this.init();
-      this.$el.appendChild(this.$fragment);
+  init () {
+    if (this.el) {
+      this.fragment = Compile.nodeToFragment(this.el);
+      this.compileElement(this.fragment);
+      this.el.appendChild(this.fragment);
+    } else {
+      console.log('DOM 不存在');
     }
   }
 
-  init(){
-    this.compileElement(this.$fragment);
-  }
-
-  compileElement(el) {
-    const childNodes = el.childNodes, me = this;
-    [].slice.call(childNodes).forEach((node) =>{
-      const text = node.textContent;
-      const reg = /\{\{(.*)\}\}/;    // 表达式文本
-      // 按元素节点方式编译
-      if (Compile.isElementNode(node)) {
-        me.compile(node);
-      } else if (Compile.isTextNode(node) && reg.test(text)) {
-        me.compileText(node, RegExp.$1);
-      }
-      // 遍历编译子节点
-      if (node.childNodes && node.childNodes.length) {
-        me.compileElement(node);
-      }
-    });
-  }
-
-  static isElementNode(node) {
-    return node.nodeType === 1;
-  }
-
-  static isTextNode(node) {
-    return node.nodeType === 3;
-  }
-
-  compile(node) {
-    var nodeAttrs = node.attributes, me = this;
-    [].slice.call(nodeAttrs).forEach(function(attr) {
-      // 规定：指令以 v-xxx 命名
-      // 如 <span v-text="content"></span> 中指令为 v-text
-      var attrName = attr.name;    // v-text
-      if (me.isDirective(attrName)) {
-        var exp = attr.value; // content
-        var dir = attrName.substring(2);    // text
-        if (me.isEventDirective(dir)) {
-          // 事件指令, 如 v-on:click
-          compileUtil.eventHandler(node, me.$vm, exp, dir);
+  compile (node) {
+    const nodeAttrs = node.attributes;
+    [...nodeAttrs].forEach((attr) => {
+      let attrName = attr.name;
+      if (Compile.isDirective(attrName)) {
+        let directive = attrName.substring(2);
+        if (Compile.isModelDirective(directive)) {
+          this.compileModel(attr, node);
         } else {
-          // 普通指令
-          compileUtil[dir] && compileUtil[dir](node, me.$vm, exp);
+          //todo: add more directive
         }
       }
+    })
+  }
+
+  compileModel (attr, node) {
+    let val = this.vm[attr.value];
+    Compile.modelUpdate(node, val);
+    new Watcher(this.vm, attr.value, (value) => {
+      Compile.modelUpdate(node, value)
+    });
+    node.addEventListener('input', (e) => {
+      const newValue = e.target.value;
+      if (val === newValue) {
+        return;
+      }
+      this.vm[attr.value] = newValue;
+      val = newValue;
     });
   }
 
-  compileText(node, exp) {
-    compileUtil.text(node, this.$vm, exp);
+  compileElement (ele) {
+    const childNodes = ele.childNodes;
+    childNodes.forEach((node) => {
+      const regex = /\{\{(.*)\}\}/;
+      let text = node.textContent;
+      if (Compile.isElementNode(node)) {
+        this.compile(node);
+      } else if (Compile.isTextNode(node) && regex.test(text)) {
+        this.compileTextNode(node, regex.exec(text)[1]);
+      }
+      if (node.childNodes && node.childNodes.length) {
+        this.compileElement(node);
+      }
+    })
   }
 
-  static node2Fragment(el) {
-    let fragment = document.createDocumentFragment(), child;
-    while (child = el.firstChild) {
+  compileTextNode (node, exp) {
+    const oldValue = this.vm[exp];
+    Compile.updateText(node, oldValue);
+    new Watcher(this.vm, exp, (value) => {
+      Compile.updateText(node, value);
+    });
+
+  }
+
+  static isDirective (attr) {
+    return attr.indexOf("v-") !== -1;
+  }
+
+  static isModelDirective (attr) {
+    return "model" === attr;
+  }
+
+  static nodeToFragment (ele) {
+    const fragment = document.createDocumentFragment();
+    let child = ele.firstChild;
+    while (child) {
       fragment.appendChild(child);
+      child = ele.firstChild;
     }
     return fragment;
   }
+
+  static updateText (node, value) {
+    node.textContent = typeof value === 'undefined' ? '' : value;
+  }
+
+  static isTextNode (node) {
+    return node.nodeType === 3;
+  }
+
+  static isElementNode (node) {
+    return node.nodeType === 1;
+  }
+
+  static modelUpdate (node, value) {
+    node.value = typeof value === 'undefined' ? '' : value;
+  }
 }
+

@@ -14,7 +14,7 @@ export default class Watcher {
   }
 
   run () {
-    const value = this.get();
+    const value = this.vm.data[this.exp];
     const oldVal = this.value;
     if (value !== oldVal) {
       this.value = value;

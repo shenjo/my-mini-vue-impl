@@ -1,14 +1,16 @@
 export default class Dep {
   constructor () {
-    this.subs = [];
+    this._subs = [];
   }
 
   addSub (sub) {
-    this.subs.push(sub);
+    console.log(`exp = ${sub.exp} has successfully subscribe.`);
+    this._subs.push(sub);
   }
 
   notify () {
-    this.subs.forEach((sub) => {
+    console.log(`there are ${this._subs.length} need to update.`);
+    this._subs.forEach((sub) => {
       sub.update();
     })
   }

@@ -18,18 +18,17 @@ export default class Observer {
 
   defineReactive (obj, key, val) {
     let dep = new Dep();
-    this.observer(obj[key]);
+    new Observer(obj[key]);
     Object.defineProperty(obj, key, {
       enumerable: true,
       configurable: false,
       get: function() {
         if (Dep.target) {
-          dep.subs.push(Dep.target);
+          dep.addSub(Dep.target);
         }
         return val;
       },
       set: function(newVal) {
-        console.log(`detect change from ${val} ===> ${newVal}`);
         val = newVal;
         dep.notify();
       }
